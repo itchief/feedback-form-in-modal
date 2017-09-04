@@ -1,6 +1,11 @@
 <?php
-//открывает сессию
+//открываем сессию
 session_start();
+
+$id = 'captcha';
+if (isset($_GET['id'])) {
+    $id = filter_var($_GET['id'], FILTER_SANITIZE_STRING);
+}
 
 //присваивает PHP переменной captchastring строку символов
 $captchastring = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyz';
@@ -8,11 +13,11 @@ $captchastring = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890abcdefghijklmnopqrstuvwxyz
 $captchastring = substr(str_shuffle($captchastring), 0, 6);
 //инициализация переменной сессии с помощью сгенерированной подстроки captchastring,
 //содержащей 6 символов
-$_SESSION["code"] = $captchastring;
+$_SESSION[$id] = $captchastring;
 
-//Генерирует CAPTCHA
+// Генерируем CAPTCHA
 
-//создает новое изображение из файла background.png 
+// создает новое изображение из файла background.png
 $image = imagecreatefrompng(dirname(__FILE__) . '/background.png');
 //устанавливает цвет (R-200, G-240, B-240) изображению, хранящемуся в $image
 $colour = imagecolorallocate($image, 200, 240, 240);
