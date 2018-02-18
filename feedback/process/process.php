@@ -1,5 +1,13 @@
 <?php
 
+// PHPMailer
+use PHPMailer\PHPMailer\PHPMailer;
+use PHPMailer\PHPMailer\Exception;
+
+require_once('../phpmailer/src/Exception.php');
+require_once('../phpmailer/src/PHPMailer.php');
+require_once('../phpmailer/src/SMTP.php');
+
 // подключаем файл настроек
 require_once dirname(__FILE__) . '/process_settings.php';
 
@@ -9,44 +17,35 @@ session_start();
 // переменная, хранящая основной статус обработки формы
 $data['result'] = 'success';
 
-// функция для проверки количество символов в тексте
-function checkTextLength($text, $minLength, $maxLength)
-{
-    $result = false;
-    $textLength = mb_strlen($text, 'UTF-8');
-    if (($textLength >= $minLength) && ($textLength <= $maxLength)) {
-        $result = true;
-    }
-    return $result;
-}
-
-// обрабатывать будем только ajax запросы
+// обработка только ajax запросов (при других запросах завершаем выполнение скрипта)
 if (empty($_SERVER['HTTP_X_REQUESTED_WITH']) || $_SERVER['HTTP_X_REQUESTED_WITH'] != 'XMLHttpRequest') {
     exit();
 }
-// обрабатывать данные будет только если они посланы методом POST
+// обработка данных, посланных только методом POST (при остальных методах завершаем выполнение скрипта)
 if ($_SERVER['REQUEST_METHOD'] != 'POST') {
     exit();
 }
 
-// валидация формы
-
-// валидация поля name
+/* 1 ЭТАП - ВАЛИДАЦИЯ ДАННЫХ (ЗНАЧЕНИЙ ПОЛЕЙ ФОРМЫ) */
+// name
 if (isset($_POST['name'])) {
     $name = filter_var($_POST['name'], FILTER_SANITIZE_STRING); // защита от XSS
-    if (!checkTextLength($name, 2, 30)) { // проверка на количество символов в тексте
-        $data['name'] = 'Поле <b>Имя</b> содержит недопустимое количество символов';
+    $nameLength = mb_strlen($name, 'UTF-8');
+    if ($nameLength < 2) {
+        $data['name'] = 'Текст должен быть не короче 2 симв. Длина текста сейчас: '. $nameLength .' симв.';
+        $data['result'] = 'error';
+    } else if ($nameLength > 30) {
+        $data['name'] = 'Длина текста не должна превышать 30 симв. (сейчас '. $nameLength .' симв.).';
         $data['result'] = 'error';
     }
 } else {
-    $data['name'] = 'Поле <b>Имя</b> не заполнено';
+    $data['name'] = 'Заполните это поле.';
     $data['result'] = 'error';
 }
-
-//валидация поля email
+// email
 if (isset($_POST['email'])) {
     if (!filter_var($_POST['email'], FILTER_VALIDATE_EMAIL)) { // защита от XSS
-        $data['email'] = 'Поле <b>Email</b> имеет не корректный адрес';
+        $data['email'] = 'Адрес электронной почты не корректный';
         $data['result'] = 'error';
     } else {
         $email = $_POST['email'];
@@ -55,32 +54,33 @@ if (isset($_POST['email'])) {
     $data['email'] = 'Поле <b>Email</b> не заполнено';
     $data['result'] = 'error';
 }
-
-//валидация поля message
+// message
 if (isset($_POST['message'])) {
     $message = filter_var($_POST['message'], FILTER_SANITIZE_STRING); // защита от XSS
-    if (!checkTextLength($message, 20, 500)) { // проверка на количество символов в тексте
-        $data['message'] = 'Поле <b>Сообщение</b> содержит недопустимое количество символов';
+    $messageLength = mb_strlen($message, 'UTF-8');
+    if ($messageLength < 20) {
+        $data['message'] = 'Текст должен быть не короче 20 симв. Длина текста сейчас: '. $messageLength .' симв.';
+        $data['result'] = 'error';
+    } else if ($messageLength > 500) {
+        $data['message'] = 'Длина текста не должна превышать 500 симв. (сейчас '. $messageLength .' симв.)';
         $data['result'] = 'error';
     }
 } else {
-    $data['message'] = 'Поле <b>Сообщение</b> не заполнено';
+    $data['message'] = 'Заполните это поле.';
     $data['result'] = 'error';
 }
-
-//валидация капчи
+// капчи
 if (isset($_POST['captcha']) && isset($_SESSION['captcha'])) {
     $captcha = filter_var($_POST['captcha'], FILTER_SANITIZE_STRING); // защита от XSS
     if ($_SESSION['captcha'] != $captcha) { // проверка капчи
-        $data['captcha'] = 'Вы неправильно ввели код с картинки';
+        $data['captcha'] = 'Код не соответствует изображению.';
         $data['result'] = 'error';
     }
 } else {
-    $data['captcha'] = 'Произошла ошибка при проверке проверочного кода';
+    $data['captcha'] = 'Ошибка при проверке кода';
     $data['result'] = 'error';
 }
-
-// валидация файлов
+// файлы (валидация и перемещение в папку Uploads)
 if (isset($_FILES['attachment'])) {
     // перебор массива $_FILES['attachment']
     foreach ($_FILES['attachment']['error'] as $key => $error) {
@@ -97,12 +97,12 @@ if (isset($_FILES['attachment'])) {
             // проверяем расширение загруженного файла
             if (!in_array($fileExtension, $allowedExtensions)) {
                 $resultCheckExtension = false;
-                $data['info'][] = 'Тип файла ' . $fileName . ' не соответствует разрешенному';
+                $data['attachment'][] = 'Файл <b>' . $fileName . '</b> имеет не допустимое разрешение';
                 $data['result'] = 'error';
             }
             // проверяем размер файла
             if ($resultCheckExtension && ($fileSize > MAX_FILE_SIZE)) {
-                $data['info'][] = 'Размер файла ' . $fileName . ' превышает 512 Кбайт';
+                $data['attachment'][] = 'Файл <b>' . $fileName . '</b> имеет не допустимый размер (более 512 Кбайт)';
                 $data['result'] = 'error';
             }
         }
@@ -124,7 +124,7 @@ if (isset($_FILES['attachment'])) {
             // перемещаем файл в директорию
             if (!move_uploaded_file($fileTmp, $uploadPath . $fileNewName)) {
                 // ошибка при перемещении файла
-                $data['info'][] = 'Ошибка при загрузке файлов';
+                $data['attachment'][] = 'Ошибка при загрузке файла <b>' . $fileName . '</b>';
                 $data['result'] = 'error';
             } else {
                 $attachments[] = $uploadPath . $fileNewName;
@@ -136,8 +136,6 @@ if (isset($_FILES['attachment'])) {
 
 // отправка формы (данных на почту)
 if ($data['result'] == 'success') {
-    // включить файл PHPMailerAutoload.php
-    require_once('../phpmailer/PHPMailerAutoload.php');
 
     //формируем тело письма
     $bodyMail = file_get_contents('email.tpl'); // получаем содержимое email шаблона

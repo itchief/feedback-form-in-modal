@@ -4,15 +4,26 @@
 $(function () {
 
     var ProcessForm = function (parameters) {
-
         // id формы обратной связи
-        this.idForm = parameters['idForm'] || 'feedbackForm';
+        this.id_form = parameters['id_form'] || 'feedbackForm';
         // скрыть форму после отправки
-        this.hideForm = parameters['hideForm'] || true;
+        if (parameters['hideForm'] === false) {
+            this.hideForm = parameters['hideForm'];
+        } else {
+            this.hideForm = true;
+        }
         // наличие у формы блока загрузки файлов
-        this.existenceUploadsFile = parameters['existenceUploadsFile'] || true;
+        if (parameters['existenceUploadsFile'] === false) {
+            this.existenceUploadsFile = parameters['existenceUploadsFile'];
+        } else {
+            this.existenceUploadsFile = true;
+        }
         // наличие у формы капчи
-        this.existenceCaptcha = parameters['existenceCaptcha'] || true;
+        if (parameters['existenceCaptcha'] === false) {
+            this.existenceCaptcha = parameters['existenceCaptcha'];
+        } else {
+            this.existenceCaptcha = true;
+        }
         // количество элементов input для загрузки файлов
         this.countFiles = parameters['countFiles'] || 5;
         // максимальный размер файла для загрузки (по умолчанию 512 Кбайт)
@@ -20,35 +31,40 @@ $(function () {
         // допустимые разрешения файлов
         this.validFileExtensions = parameters['validFileExtensions'] || ['jpg', 'jpeg', 'bmp', 'gif', 'png'];
         // флажок о принятии пользовательского соглашения перед отправкой формы
-        this.agreeCheckbox = parameters['agreeCheckbox'] || true;
-
+        if (parameters['agreeCheckbox'] === false) {
+            this.agreeCheckbox = parameters['agreeCheckbox'];
+        } else {
+            this.agreeCheckbox = true;
+        }
         // инициализация
         this.init = function () {
-            // получаем форму
-            var submitForm = document.getElementById(this.idForm);
+            var submitForm = document.getElementById(this.id_form);
+            this.form = $('#' + this.id_form);
+            this.attachments_code = this.form.find('.attachments').html();
+            this.custom_file = '<div class="custom-file mt-1">' +
+                this.form.find('.custom-file').html() + '</div>';
+            var form = this.form;
             // отправка формы
-            $(submitForm).submit($.proxy(this.submitForm, this));
+            form.submit($.proxy(this.submitForm, this));
             if (this.existenceCaptcha) {
                 // обновление капчи
-                $(submitForm).find('.refresh-captcha').click($.proxy(this.refreshCaptcha, this));
+                form.find('.refresh-captcha').click($.proxy(this.refreshCaptcha, this));
             }
-
             if (this.existenceUploadsFile) { // добавление новых элементов input с type="file" и изменение существующих
-                $('#' + this.idForm + ' .countFiles').text(this.countFiles);
+                form.find('.countFiles').text(this.countFiles);
                 // добавление нового элемента input с type="file"
-                $(document).on('change', '#' + this.idForm + ' input[name="attachment[]"]', $.proxy(this.changeInputFile, this));
+                $(document).on('change', '#' + this.id_form + ' input[name="attachment[]"]', $.proxy(this.changeInputFile, this));
             }
-
             if (this.agreeCheckbox) { // добавление новых элементов input с type="file"
                 // добавление нового элемента input с type="file"
-                $(document).on('change', '#' + this.idForm + ' input[name="agree"]', $.proxy(this.changeAgreement, this));
+                $(document).on('change', '#' + this.id_form + ' input[name="agree"]', $.proxy(this.changeAgreement, this));
             }
-
             if (this.hideForm) {
-                $(submitForm).parent().find('.show-form').click(function (e) {
+                form.parent().find('.form-success-link').click(function (e, self) {
                     e.preventDefault();
-                    $(this).closest('.success-message').addClass('hidden');
-                    $(submitForm).show();
+                    $(this).closest('.form-success').addClass('d-none');
+                    form.find('.form-error').addClass('d-none');
+                    form.show();
                 });
             }
         };
@@ -56,8 +72,7 @@ $(function () {
 
     // переключить во включенное или выключенное состояние кнопку submit
     ProcessForm.prototype.changeStateSubmit = function (state) {
-        var submitForm = document.getElementById(this.idForm);
-        $(submitForm).find('[type="submit"]').prop('disabled', state);
+        this.form.find('[type="submit"]').prop('disabled', state);
     };
 
     // изменение состояния кнопки submit в зависимости от состояния checkbox agree
@@ -88,16 +103,11 @@ $(function () {
     ProcessForm.prototype.validateForm = function () {
         var _this = this;
         var validForm = true;
-        var submitForm = document.getElementById(this.idForm);
-        $(submitForm).find('input,textarea').each(function () {
+        this.form.find('input,textarea').not('[type="file"]').each(function () {
             if (this.checkValidity()) {
                 _this.changeStateInput(this, 'success');
             } else {
-                _this.changeStateInput(this, 'error');
-                $.jGrowl('Поле: "<strong>' + $(this).parent().find('label').text() + '</strong>"<br>' + this.validationMessage, {
-                    theme: 'jgrowl-error',
-                    life: 10000
-                });
+                _this.changeStateInput(this, 'error', this.validationMessage);
                 validForm = false;
             }
         });
@@ -105,25 +115,15 @@ $(function () {
     };
 
     // изменение состояния элемента формы (success, error, clear)
-    ProcessForm.prototype.changeStateInput = function (input, state) {
+    ProcessForm.prototype.changeStateInput = function (input, state, message) {
         input = $(input);
-        var inputGroup = input.parents('.form-group');
-        var glyphiconInput = inputGroup.find('.form-control-feedback');
         if (state === 'error') {
-            inputGroup.removeClass('has-success').addClass('has-error');
-            console.log(input.prop('tagName'));
-            console.log(input.prop('tagName').toLowerCase());
-            if (input.prop("tagName").toLowerCase() !== 'textarea') {
-                glyphiconInput.removeClass('glyphicon-ok').addClass('glyphicon-remove');
-            }
+            input.removeClass('is-valid').addClass('is-invalid');
+            input.parents('.form-group').find('.invalid-feedback').text(message);
         } else if (state === 'success') {
-            inputGroup.removeClass('has-error').addClass('has-success');
-            if (input.prop("tagName").toLowerCase() !== 'textarea') {
-                glyphiconInput.removeClass('glyphicon-remove').addClass('glyphicon-ok');
-            }
+            input.removeClass('is-invalid').addClass('is-valid');
         } else {
-            inputGroup.removeClass('has-success has-error');
-            glyphiconInput.removeClass('glyphicon-ok glyphicon-remove');
+            input.removeClass('is-valid is-invalid');
         }
     };
 
@@ -132,8 +132,7 @@ $(function () {
         if (!this.existenceUploadsFile) {
             return;
         }
-        var submitForm = document.getElementById(this.idForm);
-        var files = $(submitForm).find('[name="attachment[]"]');
+        var files = this.form.find('[name="attachment[]"]');
         for (var i = 0; i < files.length; i++) {
             // получить список файлов элемента input с type="file"
             var fileList = files[i].files;
@@ -154,7 +153,7 @@ $(function () {
     // сбор данных для отправки на сервер с помощью FormData
     ProcessForm.prototype.collectData = function () {
         this.changeStateImages(true); // отключаем отправку файлов (disabled) не удовлетворяющие требованиям
-        this.dataForm = new FormData(document.getElementById(this.idForm)); // собираем данные
+        this.dataForm = new FormData(document.getElementById(this.id_form)); // собираем данные
         this.changeStateImages(false); // после сбора данных переводим состояние элементов в enabled
     };
 
@@ -168,13 +167,13 @@ $(function () {
         this.collectData();
         $.ajax({
             type: "POST",
-            url: $('#' + _this.idForm).attr('action'),
+            url: _this.form.attr('action'),
             data: _this.dataForm, // данные для отправки на сервер
             contentType: false,
             processData: false,
             cache: false,
             beforeSend: function () {
-                $('#' + _this.idForm + ' .progress').show();
+                _this.form.find('.progress').removeClass('d-none');
                 _this.changeStateSubmit(true);
             },
 
@@ -184,153 +183,137 @@ $(function () {
                     myXhr.upload.addEventListener('progress', function (event) {
                         // если известно количество байт для пересылки
                         if (event.lengthComputable) {
-                            // получаем общее количество байт для пересылки
-                            var total = event.total;
-                            // получаем какое количество байт уже отправлено
-                            var loaded = event.loaded;
-                            // определяем процент отправленных данных на сервер
-                            var progress = ((loaded * 100) / total).toFixed(1);
-                            // обновляем состояние прогресс бара Bootstrap
-                            var progressBar = $('#' + _this.idForm + ' .progress-bar');
-                            progressBar.attr('aria-valuenow', progress);
-                            progressBar.width(progress + '%');
-                            progressBar.find('span').text(progress + '%');
+                            var total = event.total; // общее количество байт для отправки
+                            var loaded = event.loaded; // сколько уже отправлено
+                            var progress = ((loaded * 100) / total).toFixed(1); // процент отправленных данных
+                            // обновляем состояние прогресс бара
+                            _this.form.find('.progress-bar')
+                                .attr('aria-valuenow', progress)
+                                .width(progress + '%')
+                                .find('span')
+                                    .text(progress + '%');
                         }
                     }, false);
                 }
                 return myXhr;
             },
-
-
             success: function (data) {
-                $('#' + _this.idForm + ' .progress').hide();
-
+                _this.form
+                    .find('.progress').addClass('d-none').end()
+                    .find('.attachments-error').parent().addClass('d-none');
                 data = JSON.parse(data);
-                //устанавливаем элементу, содержащему текст ошибки, пустую строку
-                $('#' + _this.idForm + '.error').text('');
-                var submitForm = $('#' + _this.idForm);
                 // если сервер вернул ответ success, то значит двнные отправлены
                 if (data.result === "success") {
-                    $.jGrowl('Форма успешно отправлена!', {theme: 'jgrowl-success', life: 10000});
-                    document.getElementById(_this.idForm).reset();
-
-                    submitForm.find('input,textarea').each(function () {
+                    document.getElementById(_this.id_form).reset();
+                    _this.form.find('input,textarea').each(function () {
                         _this.changeStateInput(this, 'clear');
                     });
                     if (_this.existenceUploadsFile) {
-                        $('#' + _this.idForm + ' .countFiles').parents('.form-group').html(
-                            '<p style="font-weight: 700;">Прикрепить к сообщению файлы (максимум <span class="countFiles">' +
-                            _this.countFiles + '</span>):</p><input type="file" name="attachment[]">' +
-                            '<p style="margin-top: 3px; margin-bottom: 3px; color: #ff0000;"></p>');
+                        _this.form.find('.attachments').html(_this.attachments_code);
                     }
                     if (_this.existenceCaptcha) {
                         _this.refreshCaptcha();
                     }
                     if (_this.hideForm) {
-                        submitForm.hide();
-                        submitForm.parent().find('.success-message').removeClass('hidden');
+                        _this.form.hide();
+                        _this.form.parent().find('.form-success').removeClass('d-none');
                     }
                 } else {
+                    _this.form
+                        .find('.progress-bar').css('width', '0%').end()
+                        .find('.form-error').removeClass('d-none').end()
+                        .find('.attachments-error').parent().addClass('d-none');
                     _this.changeStateSubmit(false);
-                    $('#' + _this.idForm + ' .progress-bar').css('width', '0%');
-                    if (data.hasOwnProperty('captcha')) {
-                        var captcha = submitForm.find('[name="captcha"]').eq(0);
-                        $(captcha).val('');
-                        var imgCaptcha = submitForm.find('.img-captcha');
-                        var src = imgCaptcha.attr('data-src');
-                        if (src.indexOf('?id') !== -1) {
-                            src += '&rnd='+(new Date()).getTime();
-                        } else {
-                            src += '?rnd='+(new Date()).getTime();
-                        }
-                        imgCaptcha.attr('src',src);
-                    }
-
-                    // если сервер вернул ответ error...
-                    $.jGrowl('<strong>Ошибка!</strong><br>Форму не удалось отправить.', {
-                        theme: 'jgrowl-warning',
-                        life: 10000
-                    });
-
                     // сбрасываем состояние всех input и textarea элементов
-                    submitForm.find('input,textarea').each(function () {
+                    _this.form.find('input,textarea').not('[type="file"]').each(function () {
                         _this.changeStateInput(this, 'clear');
                     });
-
-                    // отображаем все ошибки
+                    // отображаем ошибки
                     for (var error in data) {
                         if (data.hasOwnProperty(error)) {
-                            if (error === 'result') { // кроме той, которая имеет ключ result
-                                continue;
-                            }
-                            if (error !== 'info' && error !== 'log') { // кроме тех, которые имеют ключ info или log
-                                $.jGrowl(data[error], {theme: 'jgrowl-error', life: 5000});
-                                _this.changeStateInput($(submitForm).find('[name="' + error + '"]').eq(0), 'error');
-                            }
-                            if (error === 'info') { // выводим все сообщения с ключом info с помощью jGrowl
-                                data[error].forEach(function (info, i, error) {
-                                    $.jGrowl(info, {theme: 'jgrowl-error', life: 5000});
+                            if (error === 'captcha') { // кроме той, которая имеет ключ result
+                                var captcha = _this.form.find('[name="captcha"]').eq(0);
+                                $(captcha).val('');
+                                var imgCaptcha = _this.form.find('.img-captcha');
+                                var src = imgCaptcha.attr('data-src');
+                                if (src.indexOf('?id') !== -1) {
+                                    src += '&rnd='+(new Date()).getTime();
+                                } else {
+                                    src += '?rnd='+(new Date()).getTime();
+                                }
+                                imgCaptcha.attr('src',src);
+                                _this.changeStateInput(_this.form.find('[name="' + error + '"]')[0], 'error', data[error]);
+                            } else if (error !== 'attachment' && error !== 'log') {
+                                _this.changeStateInput(_this.form.find('[name="' + error + '"]')[0], 'error', data[error]);
+                            } else if (error === 'attachment') { // ошибки, связанные с прикреплёнными файлами
+                                var attachments = '<ul class="mb-0 pl-3">';
+                                data[error].forEach(function (attachment, i, error) {
+                                    attachments += '<li>' + attachment + '</li>';
                                 });
-                            }
-                            if (error === 'log') { // выводим все сообщения с ключом log в консоль браузера
+                                attachments += '</ul>';
+                                _this.form.find('.attachments-error')
+                                    .html(attachments)
+                                    .parent()
+                                        .removeClass('d-none');
+                            } else if (error === 'log') { // выводим все сообщения с ключом log в консоль браузера
                                 data[error].forEach(function (log, i, error) {
                                     console.log(log);
                                 });
                             }
                         }
                     }
+                    if (_this.form.find('.is-invalid').length > 0) {
+                        _this.form.find('.is-invalid')[0].focus();
+                    }
                 }
             },
             error: function (request) {
-                $.jGrowl('Произошла ошибка ' + request.responseText + ' при отправке данных.', {
-                    theme: 'jgrowl-error',
-                    life: 5000
-                });
+                _this.form
+                    .find('.progress-bar').css('width', '0%').end()
+                    .find('.form-error').removeClass('d-none');
             }
         });
     };
-
     // обновление капчи
     ProcessForm.prototype.refreshCaptcha = function () {
-        var imgCaptcha = $('#' + this.idForm).find('.img-captcha');
-        var src = imgCaptcha.attr('data-src');
-        if (src.indexOf('?id') !== -1) {
-            src += '&rnd='+(new Date()).getTime();
+        var captcha = this.form.find('.img-captcha');
+        var src_captcha = captcha.attr('data-src');
+        if (src_captcha.indexOf('?id') !== -1) {
+            src_captcha += '&rnd='+(new Date()).getTime();
         } else {
-            src += '?rnd='+(new Date()).getTime();
+            src_captcha += '?rnd='+(new Date()).getTime();
         }
-        imgCaptcha.attr('src',src);
+        captcha.attr('src',src_captcha);
     };
-
     // изменение элемента input с type="file"
     ProcessForm.prototype.changeInputFile = function (e) {
-        // условия для добавления нового элемента input с type="file"
-        var isSelectFile = e.currentTarget.files.length > 0;
-        var isNextInput = $(e.currentTarget).next('p').next('input[name="attachment[]"]').length === 0;
-        var isMaxInput = $('#' + this.idForm + ' input[name="attachment[]"]').length < this.countFiles;
-        var inputFile =
-            '<input type="file" name="attachment[]">' +
-            '<p style="margin-top: 3px; margin-bottom: 3px; color: #ff0000;"></p>';
-        if (isSelectFile && isNextInput && isMaxInput) {
-            $(e.currentTarget).next('p').after(inputFile);
+        // условие для добавления нового блока custom-file
+        var is_selected = e.currentTarget.files.length > 0;
+        var is_added = $(e.currentTarget).closest('.custom-file').next('.custom-file').length === 0;
+        var is_max_count = this.form.find('input[name="attachment[]"]').length < this.countFiles;
+        if (is_selected && is_added && is_max_count) {
+            $(e.currentTarget).closest('.custom-file').after(this.custom_file);
         }
-        // если файл выбран, то выполняем следующие действия...
+        // валидация файла
         if (e.currentTarget.files.length > 0) {
             // получим файл
             var file = e.currentTarget.files[0];
+            $(e.currentTarget).next('.custom-file-label').addClass("selected").text(file.name);
             // проверим размер и расширение файла
             if (file.size > this.maxSizeFile) {
-                $(e.currentTarget).next('p').text('*Файл не будет отправлен, т.к. его размер больше ' + this.maxSizeFile / 1024 + 'Кбайт');
+                $(e.currentTarget).removeClass('is-valid').addClass('is-invalid');
+                $(e.currentTarget).closest('.custom-file').find('.invalid-feedback').text('Файл не будет отправлен, т.к. его размер больше ' + this.maxSizeFile / 1024 + 'Кбайт');
             } else if (!this.validateFileExtension(file.name)) {
-                $(e.currentTarget).next('p').text('*Файл не будет отправлен, т.к. его тип не соответствует разрешённому');
+                $(e.currentTarget).removeClass('is-valid').addClass('is-invalid');
+                $(e.currentTarget).closest('.custom-file').find('.invalid-feedback').text('Файл не будет отправлен, т.к. его тип не соответствует разрешённому.');
             } else {
-                if ($(e.currentTarget).next('p')) {
-                    $(e.currentTarget).next('p').text('');
-                }
+                $(e.currentTarget).removeClass('is-invalid').addClass('is-valid');
             }
         } else {
             // если после изменения файл не выбран, то сообщаем об этом пользователю
-            $(e.currentTarget).next('p').text('* Файл не будет отправлен, т.к. он не выбран');
+            $(e.currentTarget).next('.custom-file-label').addClass("selected").text('');
+            $(e.currentTarget).removeClass('is-valid').addClass('is-invalid');
+            $(e.currentTarget).closest('.custom-file').find('.invalid-feedback').text('Файл не будет отправлен, т.к. он не выбран');
         }
     };
 
@@ -341,7 +324,7 @@ $(function () {
      ключ: значение;
      ...
      }
-     idForm - id формы обратной связи (по умолчанию feedbackForm)
+     id_form - id формы обратной связи (по умолчанию feedbackForm)
      existenceUploadsFile - наличие у формы блока загрузки файлов (по умолчанию true)
      countFiles - количество файлов для загрузки (по умолчанию 5)
      maxSizeFile - максиальный размер файла в байтах (по умолчанию 524288 байт)
@@ -351,10 +334,10 @@ $(function () {
      agreeCheckbox - флажок о принятии пользовательского соглашения перед отправкой формы (по умолчанию true)
 
      */
-    var formFeedback = new ProcessForm({idForm: 'feedbackForm', maxSizeFile: 524288});
+    var formFeedback = new ProcessForm({id_form: 'feedbackForm', maxSizeFile: 524288});
     formFeedback.init();
 
-    //var contactForm = new ProcessForm({ idForm: 'contactForm', existenceUploadsFile: false, existenceCaptcha: false });
+    //var contactForm = new ProcessForm({ id_form: 'contactForm', existenceUploadsFile: false, existenceCaptcha: false });
     //contactForm.init();
 
 });

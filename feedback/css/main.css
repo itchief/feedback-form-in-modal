@@ -1,3 +1,11 @@
+.custom-file-label {
+    overflow: hidden;
+}
+
+.custom-file-label::after {
+    content: "Найти";
+}
+
 .panel-success {
     border-color: #29b74e;
 }
