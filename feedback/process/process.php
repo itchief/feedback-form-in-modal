@@ -1,5 +1,7 @@
 <?php
 
+header('Content-Type: application/json');
+
 // PHPMailer
 use PHPMailer\PHPMailer\PHPMailer;
 use PHPMailer\PHPMailer\Exception;
@@ -51,7 +53,7 @@ if (isset($_POST['email'])) {
         $email = $_POST['email'];
     }
 } else {
-    $data['email'] = 'Поле <b>Email</b> не заполнено';
+    $data['email'] = 'Заполните это поле.';
     $data['result'] = 'error';
 }
 // message
@@ -97,12 +99,12 @@ if (isset($_FILES['attachment'])) {
             // проверяем расширение загруженного файла
             if (!in_array($fileExtension, $allowedExtensions)) {
                 $resultCheckExtension = false;
-                $data['attachment'][] = 'Файл <b>' . $fileName . '</b> имеет не допустимое разрешение';
+                $data['attachment'][$fileName] = 'Файл ' . $fileName . ' имеет не допустимое разрешение';
                 $data['result'] = 'error';
             }
             // проверяем размер файла
             if ($resultCheckExtension && ($fileSize > MAX_FILE_SIZE)) {
-                $data['attachment'][] = 'Файл <b>' . $fileName . '</b> имеет не допустимый размер (более 512 Кбайт)';
+                $data['attachment'][$fileName] = 'Файл ' . $fileName . ' имеет не допустимый размер (более 512 Кбайт)';
                 $data['result'] = 'error';
             }
         }
@@ -124,7 +126,7 @@ if (isset($_FILES['attachment'])) {
             // перемещаем файл в директорию
             if (!move_uploaded_file($fileTmp, $uploadPath . $fileNewName)) {
                 // ошибка при перемещении файла
-                $data['attachment'][] = 'Ошибка при загрузке файла <b>' . $fileName . '</b>';
+                $data['attachment'][] = 'Ошибка при загрузке файла ' . $fileName ;
                 $data['result'] = 'error';
             } else {
                 $attachments[] = $uploadPath . $fileNewName;
