@@ -233,6 +233,8 @@ var feedbackForm = (function () {
         }
         if (_isAgreeCheckbox) {
           _changeStateSubmit(_$form, true);
+        } else {
+          _changeStateSubmit(_$form, false);
         }
         if (!_$form.find('.form-error').hasClass('d-none')) {
           _$form.find('.form-error').addClass('d-none');
@@ -258,7 +260,7 @@ var feedbackForm = (function () {
         .end()
         .find('.form-error')
         .removeClass('d-none');
-      _changeStateSubmit(false);
+      _changeStateSubmit(_$form, false);
       // сбрасываем состояние всех input и textarea элементов
       _$form.find('input,textarea').not('[type="file"]').each(function () {
         _setStateValidaion(this, 'clear');
